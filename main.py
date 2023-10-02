@@ -155,7 +155,7 @@ def get_train_data():
         transforms.RandomHorizontalFlip(0.5), transforms.RandomRotation(10),
         ToHSV(),
         ToComplex(),
-        ToiRGB(),
+        # ToiRGB(),
     ])
 
     trainset = torchvision.datasets.CIFAR10(
@@ -170,7 +170,7 @@ def get_test_data():
         transforms.Resize(56),
         ToHSV(),
         ToComplex(),
-        ToiRGB(),
+        # ToiRGB(),
         ])
 
     testset = torchvision.datasets.CIFAR10(
