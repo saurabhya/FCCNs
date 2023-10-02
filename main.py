@@ -6,6 +6,7 @@ import torchvision.transforms as transforms
 from tqdm import tqdm, trange
 from utils import *
 import networks as models
+import networks_new as models_new
 import wandb
 import argparse
 import torch.nn.functional as F
@@ -104,12 +105,12 @@ def model_pipeline(hyperparameters):
 
     # save the model in exchangable ONNX format
     # For saving the model in onnx format, we need a dummy input
-    dummy_input = torch.randn(4, 3, 50, 50, device= device).type(torch.complex64)
+    # dummy_input = torch.randn(4, 3, 50, 50, device= device).type(torch.complex64)
     # store the model
-    path_onnx = os.path.join(path, "model.onnx")
-    torch.onnx.export(model, dummy_input, path_onnx)
-    wandb.save(path_onnx)
-    wandb.save(path_onnx)
+    # path_onnx = os.path.join(path, "model.onnx")
+    # torch.onnx.export(model, dummy_input, path_onnx)
+    # wandb.save(path_onnx)
+    # wandb.save(path_onnx)
     wandb.save(os.path.join(path, config.model, "saved_model.pth"))
 
     run.finish()
@@ -129,6 +130,7 @@ def make():
     # model = models.AlexNet(num_classes= 10).to(device)
     # model = models.VGG('Vgg11', num_classes= 10).to(device)
     # model = models.resnet18(num_classes= 10).to(device)
+    # model = models_new.resnet18(num_classes=10).to(device)
     # print(model)
 
     # model = models.CDS_E(num_classes= 10).to(device)
