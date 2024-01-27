@@ -7,14 +7,16 @@ This repo contains code for the paper "[FCCNs: Fully Complex-valued Convolutiona
 ![FCCN](images/teaser.png)
 
 
-
 ```latex
-@InProceedings{Yadav_2023_ICCV,
-    author    = {Yadav, Saurabh and Jerripothula, Koteswar Rao},
-    title     = {FCCNs: Fully Complex-valued Convolutional Networks using Complex-valued Color Model and Loss Function},
-    booktitle = {Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV)},
-    month     = {October},
-    year      = {2023},
-    pages     = {10689-10698}
-}
+@INPROCEEDINGS{10377516,
+  author={Yadav, Saurabh and Jerripothula, Koteswar Rao},
+  booktitle={2023 IEEE/CVF International Conference on Computer Vision (ICCV)}, 
+  title={FCCNs: Fully Complex-valued Convolutional Networks using Complex-valued Color Model and Loss Function}, 
+  year={2023},
+  volume={},
+  number={},
+  pages={10655-10664},
+  keywords={Convolutional codes;Computer vision;Image color analysis;Computational modeling;Benchmark testing;Convolutional neural networks;Image classification},
+  doi={10.1109/ICCV51070.2023.00981}}
 ```
+
