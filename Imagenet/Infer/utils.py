@@ -9,11 +9,13 @@ from prettytable import PrettyTable
 
 def rgb_to_hsv_mine(image: torch.Tensor, eps: float = 1e-6) -> torch.Tensor:
     if not isinstance(image, torch.Tensor):
-        raise TypeError("Input type is not a torch.Tensor. Got {}".format(type(image)))
+        raise TypeError(
+            "Input type is not a torch.Tensor. Got {}".format(type(image)))
 
     if len(image.shape) < 3 or image.shape[-3] != 3:
         raise ValueError(
-            "Input size must have a shape of (*, 3, H, W). Got {}".format(image.shape)
+            "Input size must have a shape of (*, 3, H, W). Got {}".format(
+                image.shape)
         )
 
     maxc, _ = image.max(-3)
@@ -39,7 +41,8 @@ def rgb_to_hsv_mine(image: torch.Tensor, eps: float = 1e-6) -> torch.Tensor:
     gc: torch.Tensor = maxc_tmp[..., 1, :, :]
     bc: torch.Tensor = maxc_tmp[..., 2, :, :]
 
-    h = torch.stack([bc - gc, 2.0 * deltac + rc - bc, 4.0 * deltac + gc - rc], dim=-3)
+    h = torch.stack([bc - gc, 2.0 * deltac + rc - bc,
+                    4.0 * deltac + gc - rc], dim=-3)
 
     h = torch.gather(h, dim=-3, index=max_indices[..., None, :, :])
     h = h.squeeze(-3)
@@ -67,14 +70,16 @@ def hsv_to_rgb(image: torch.Tensor) -> torch.Tensor:
 
     hi: torch.Tensor = torch.floor(h * 6) % 6
     f: torch.Tensor = ((h * 6) % 6) - hi
-    one: torch.Tensor = torch.tensor(1.0, device=image.device, dtype=image.dtype)
+    one: torch.Tensor = torch.tensor(
+        1.0, device=image.device, dtype=image.dtype)
     p: torch.Tensor = v * (one - s)
     q: torch.Tensor = v * (one - f * s)
     t: torch.Tensor = v * (one - (one - f) * s)
 
     hi = hi.long()
     indices: torch.Tensor = torch.stack([hi, hi + 6, hi + 12], dim=-3)
-    out = torch.stack((v, q, p, p, t, v, t, v, v, q, p, p, p, p, t, v, v, q), dim=-3)
+    out = torch.stack((v, q, p, p, t, v, t, v, v, q,
+                      p, p, p, p, t, v, v, q), dim=-3)
     out = torch.gather(out, -3, indices)
 
     return out
@@ -143,108 +148,3 @@ class ToComplex(object):
 
     def __repr__(self):
         return self.__class__.__name__ + "()"
-
-
-_, term_width = os.popen("stty size", "r").read().split()
-term_width = int(term_width)
-
-TOTAL_BAR_LENGTH = 65.0
-last_time = time.time()
-begin_time = last_time
-
-
-def progress_bar(current, total, msg=None):
-    global last_time, begin_time
-    if current == 0:
-        begin_time = time.time()  # Reset for new bar.
-
-    cur_len = int(TOTAL_BAR_LENGTH * current / total)
-    rest_len = int(TOTAL_BAR_LENGTH - cur_len) - 1
-
-    sys.stdout.write(" [")
-    for i in range(cur_len):
-        sys.stdout.write("=")
-    sys.stdout.write(">")
-    for i in range(rest_len):
-        sys.stdout.write(".")
-    sys.stdout.write("]")
-
-    cur_time = time.time()
-    step_time = cur_time - last_time
-    last_time = cur_time
-    tot_time = cur_time - begin_time
-
-    L = []
-    L.append("  Step: %s" % format_time(step_time))
-    L.append(" | Tot: %s" % format_time(tot_time))
-    if msg:
-        L.append(" | " + msg)
-
-    msg = "".join(L)
-    sys.stdout.write(msg)
-    for i in range(term_width - int(TOTAL_BAR_LENGTH) - len(msg) - 3):
-        sys.stdout.write(" ")
-
-    # Go back to the center of the bar.
-    for i in range(term_width - int(TOTAL_BAR_LENGTH / 2) + 2):
-        sys.stdout.write("\b")
-    sys.stdout.write(" %d/%d " % (current + 1, total))
-
-    if current < total - 1:
-        sys.stdout.write("\r")
-    else:
-        sys.stdout.write("\n")
-    sys.stdout.flush()
-
-
-def format_time(seconds):
-    days = int(seconds / 3600 / 24)
-    seconds = seconds - days * 3600 * 24
-    hours = int(seconds / 3600)
-    seconds = seconds - hours * 3600
-    minutes = int(seconds / 60)
-    seconds = seconds - minutes * 60
-    secondsf = int(seconds)
-    seconds = seconds - secondsf
-    millis = int(seconds * 1000)
-
-    f = ""
-    i = 1
-    if days > 0:
-        f += str(days) + "D"
-        i += 1
-    if hours > 0 and i <= 2:
-        f += str(hours) + "h"
-        i += 1
-    if minutes > 0 and i <= 2:
-        f += str(minutes) + "m"
-        i += 1
-    if secondsf > 0 and i <= 2:
-        f += str(secondsf) + "s"
-        i += 1
-    if millis > 0 and i <= 2:
-        f += str(millis) + "ms"
-        i += 1
-    if f == "":
-        f = "0ms"
-    return f
-
-
-def get_mean_and_std(dataset):
-    """Compute the mean abd std value of the dataset."""
-    dataloader = torch.utils.data.DataLoader(
-        dataset, batch_size=1, shuffle=True, num_workers=4
-    )
-    mean = torch.zeros(6)
-    std = torch.zeros(6)
-    print("==> Computing mean and std..")
-
-    for inputs, targets in dataloader:
-        for i in range(6):
-            mean[i] += inputs[:, i, :, :].mean()
-            std[i] += inputs[:, i, :, :].std()
-
-    mean.div_(len(dataset))
-    std.div_(len(dataset))
-
-    return mean, std
