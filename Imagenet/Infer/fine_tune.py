@@ -14,6 +14,41 @@ import timeit
 import complexnn as comp
 
 
+class NewDataset(Dataset):
+    def __init__(self, root_dir, transform=None):
+        self.root_dir = root_dir
+        self.transform = transform
+        self.classes = sorted(os.listdir(root_dir))
+        self.class_to_idx = {cls_name: idx for idx, cls_name in enumerate(self.classes)}
+        self.img_paths = self._get_img_paths()
+
+    def _get_img_paths(self):
+        img_paths = []
+        for cls_name in self.classes:
+            cls_dir = os.path.join(self.root_dir, cls_name)
+            for img_name in os.listdir(cls_dir):
+                img_path = os.path.join(cls_dir, img_name)
+                img_paths.append((img_path, cls_name))
+        return img_paths
+
+    def __len__(self):
+        return len(self.img_paths)
+
+    def __getitem__(self, idx):
+        img_path, cls_name = self.img_paths[idx]
+        image = Image.open(img_path).convert("RGB")
+        if self.transform:
+            image = self.transform(image)
+        return image, self.class_to_idx[cls_name]
+
+
+def freeze_layers(model):
+    for name, param in model.named_parameters():
+        if "fc" in name:
+            break
+        param.requires_grad = False
+
+
 parser = argparse.ArgumentParser(description="Finetune trained model")
 parser.add_argument(
     "-a", "--arch", metavar="ARCH", default="resnet18", help="model architecture"
@@ -51,8 +86,7 @@ parser.add_argument(
     help="initial learning rate",
     dest="lr",
 )
-parser.add_argument("--momentum", default=0.9, type=float,
-                    metavar="M", help="momentum")
+parser.add_argument("--momentum", default=0.9, type=float, metavar="M", help="momentum")
 parser.add_argument(
     "--wd",
     "--weight_decay",
@@ -91,15 +125,13 @@ def model_pipeline(hyperparameters):
 
     # define schedulers here
     ######################################
-    scheduler1 = torch.optim.lr_scheduler.CosineAnnealingLR(
-        optimizer, T_max=200)
+    scheduler1 = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
     scheduler2 = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, "min", factor=0.1, patience=5, verbose=True
     )
 
     for epoch in (t := trange(args.epochs)):
-        train_loss, train_acc = train(
-            model, train_loader, criterion, optimizer)
+        train_loss, train_acc = train(model, train_loader, criterion, optimizer)
 
         test_loss, test_acc = test(model, test_loader, criterion)
 
@@ -126,7 +158,8 @@ def model_pipeline(hyperparameters):
         # Now, print the information per epoch
         # Use t.set_description() for updating the values
         t.set_description(
-            f"Epoch: {epoch + 1} Train Loss: {train_loss:.4f} Train Acc: {train_acc:.4f} Valid Loss: {test_loss:.4f} Valid Acc: {test_acc:.4f} Best Acc: {best_test_acc:.4f}"
+            f"Epoch: {epoch + 1} Train Loss: {train_loss:.4f} Train Acc: {train_acc:.4f} Valid Loss: {
+                test_loss:.4f} Valid Acc: {test_acc:.4f} Best Acc: {best_test_acc:.4f}"
         )
 
     return model
@@ -157,6 +190,9 @@ def make(args):
     # change last layer of the model
     model.fc = comp.ComplexConv2d(512, args.classes, kernel_size=1)
 
+    # freeze_model layers
+    freeze_layers(model)
+
     model = model.to(device)
 
     criterion = nn.CrossEntropyLoss().to(device)
@@ -181,9 +217,11 @@ def get_train_data():
         ]
     )
 
-    trainset = torchvision.datasets.CIFAR10(
-        root="data", train=True, download=True, transform=transform_train
-    )
+    # trainset = torchvision.datasets.CIFAR10(
+    #     root="data", train=True, download=True, transform=transform_train
+    # )
+
+    trainset = NewDataset("NewR22/train")
 
     return trainset
 
@@ -198,9 +236,10 @@ def get_test_data():
         ]
     )
 
-    testset = torchvision.datasets.CIFAR10(
-        root="data", train=False, download=True, transform=transform_test
-    )
+    # testset = torchvision.datasets.CIFAR10(
+    #     root="data", train=False, download=True, transform=transform_test
+    # )
+    testset = NewDataset("NewR22/test")
 
     return testset
 
