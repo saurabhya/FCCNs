@@ -5,13 +5,35 @@ from PIL import Image
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torchvision import transforms
+from torchvision import transforms, datasets
 from utils import *
 import argparse
 import torch.nn.functional as F
 from einops import rearrange
 import timeit
 import complexnn as comp
+from torch.utils.data import random_split, Dataset
+
+
+class Office31:
+    def __init__(self, root_dir, transform=None):
+        self.root_dir = root_dir
+        self.transform = transform
+        self.dataset = datasets.ImageFolder(root=root_dir, transform=transform)
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, idx):
+        return self.dataset[idx]
+
+
+def freeze_layers(model):
+    for name, param in model.named_parameters():
+        if "fc" not in name:
+            param.requires_grad = False
+        else:
+            param.requires_grad = True
 
 
 class NewDataset(Dataset):
@@ -19,7 +41,8 @@ class NewDataset(Dataset):
         self.root_dir = root_dir
         self.transform = transform
         self.classes = sorted(os.listdir(root_dir))
-        self.class_to_idx = {cls_name: idx for idx, cls_name in enumerate(self.classes)}
+        self.class_to_idx = {cls_name: idx for idx,
+                             cls_name in enumerate(self.classes)}
         self.img_paths = self._get_img_paths()
 
     def _get_img_paths(self):
@@ -40,13 +63,6 @@ class NewDataset(Dataset):
         if self.transform:
             image = self.transform(image)
         return image, self.class_to_idx[cls_name]
-
-
-def freeze_layers(model):
-    for name, param in model.named_parameters():
-        if "fc" in name:
-            break
-        param.requires_grad = False
 
 
 parser = argparse.ArgumentParser(description="Finetune trained model")
@@ -86,7 +102,8 @@ parser.add_argument(
     help="initial learning rate",
     dest="lr",
 )
-parser.add_argument("--momentum", default=0.9, type=float, metavar="M", help="momentum")
+parser.add_argument("--momentum", default=0.9, type=float,
+                    metavar="M", help="momentum")
 parser.add_argument(
     "--wd",
     "--weight_decay",
@@ -109,7 +126,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 def criterion2(y, theta):
-    y = F.one_hot(y, num_classes=10)
+    y = F.one_hot(y, num_classes=2)
     loss = y * theta
     return loss.mean()
 
@@ -125,13 +142,15 @@ def model_pipeline(hyperparameters):
 
     # define schedulers here
     ######################################
-    scheduler1 = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
+    scheduler1 = torch.optim.lr_scheduler.CosineAnnealingLR(
+        optimizer, T_max=200)
     scheduler2 = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, "min", factor=0.1, patience=5, verbose=True
     )
 
     for epoch in (t := trange(args.epochs)):
-        train_loss, train_acc = train(model, train_loader, criterion, optimizer)
+        train_loss, train_acc = train(
+            model, train_loader, criterion, optimizer)
 
         test_loss, test_acc = test(model, test_loader, criterion)
 
@@ -158,8 +177,7 @@ def model_pipeline(hyperparameters):
         # Now, print the information per epoch
         # Use t.set_description() for updating the values
         t.set_description(
-            f"Epoch: {epoch + 1} Train Loss: {train_loss:.4f} Train Acc: {train_acc:.4f} Valid Loss: {
-                test_loss:.4f} Valid Acc: {test_acc:.4f} Best Acc: {best_test_acc:.4f}"
+            f"Epoch: {epoch + 1} Train Loss: {train_loss:.4f} Train Acc: {train_acc:.4f} Valid Loss: {test_loss:.4f} Valid Acc: {test_acc:.4f} Best Acc: {best_test_acc:.4f}"
         )
 
     return model
@@ -167,7 +185,7 @@ def model_pipeline(hyperparameters):
 
 def make(args):
     # get data set
-    train, test = get_train_data(), get_test_data()
+    train, test = get_train_data()
     train_loader = make_loader(train, batch_size=args.batchsize)
     test_loader = make_loader(test, batch_size=args.batchsize)
 
@@ -175,9 +193,9 @@ def make(args):
     if args.arch == "resnet18":
         model = models.resnet18(num_classes=1000)
     elif args.arch == "resnet50":
-        model = models.resnet18(num_classes=1000)
+        model = models.resnet50(num_classes=1000)
     elif args.arch == "resnet152":
-        model = models.resnet18(num_classes=1000)
+        model = models.resnet152(num_classes=1000)
 
     else:
         model = None
@@ -188,12 +206,13 @@ def make(args):
     model.load_state_dict(checkpoint["state_dict"])
 
     # change last layer of the model
-    model.fc = comp.ComplexConv2d(512, args.classes, kernel_size=1)
-
-    # freeze_model layers
-    freeze_layers(model)
+    model.fc = comp.ComplexConv2d(4 * 512, args.classes, kernel_size=1)
 
     model = model.to(device)
+
+   print(f"Model parameters: {count_param_complex(model)}")
+
+    freeze_layers(model)
 
     criterion = nn.CrossEntropyLoss().to(device)
 
@@ -208,40 +227,42 @@ def get_train_data():
     transform_train = transforms.Compose(
         [
             transforms.ToTensor(),
-            transforms.Resize(58),
-            transforms.CenterCrop(56),
-            transforms.RandomHorizontalFlip(0.5),
-            transforms.RandomRotation(10),
+            transforms.Resize((224, 224)),
+            # transforms.RandomHorizontalFlip(0.5),
+            # transforms.RandomRotation(10),
             ToHSV(),
             ToComplex(),
         ]
     )
 
-    # trainset = torchvision.datasets.CIFAR10(
-    #     root="data", train=True, download=True, transform=transform_train
-    # )
-
-    trainset = NewDataset("NewR22/train")
-
-    return trainset
-
-
-def get_test_data():
-    transform_test = transforms.Compose(
-        [
-            transforms.ToTensor(),
-            transforms.Resize(56),
-            ToHSV(),
-            ToComplex(),
-        ]
+    trainset = NewDataset(
+        root_dir="TMD_SIBGRAP-2021/NewR22/train", transform=transform_train
     )
+    testset = NewDataset(
+        root_dir="TMD_SIBGRAP-2021/NewR22/test", transform=transform_train
+    )
+    # dataset = Office31(root_dir="Office_31/webcam/images",
+    #                    transform=transform_train)
+    # train_size = int(0.8 * len(dataset))
+    # test_size = len(dataset) - train_size
+    #
+    # trainset, testset = random_split(dataset, [train_size, test_size])
+    print(f"length of trainset: {len(trainset)}")
+    print(f"length of testset: {len(testset)}")
 
-    # testset = torchvision.datasets.CIFAR10(
-    #     root="data", train=False, download=True, transform=transform_test
-    # )
-    testset = NewDataset("NewR22/test")
+    return trainset, testset
 
-    return testset
+
+# def get_test_data():
+#     transform_test = transforms.Compose(
+#         [transforms.ToTensor(), transforms.Resize(56), ToHSV(), ToComplex(), ToiRGB()]
+#     )
+#
+#     testset = torchvision.datasets.CIFAR10(
+#         root="data", train=False, download=True, transform=transform_test
+#     )
+#
+#     return testset
 
 
 def make_loader(dataset, batch_size):
