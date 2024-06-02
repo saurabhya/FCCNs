@@ -311,12 +311,12 @@ def train(model, train_loader, criterion1, optimizer):
         loss.backward()
         optimizer.step()
 
-        progress_bar(
-            batch_idx,
-            len(train_loader),
-            "Loss: %.3f | Acc: %.3f%% (%d/%d)"
-            % (run_loss / (batch_idx + 1), 100.0 * correct / total, correct, total),
-        )
+        # progress_bar(
+        #     batch_idx,
+        #     len(train_loader),
+        #     "Loss: %.3f | Acc: %.3f%% (%d/%d)"
+        #     % (run_loss / (batch_idx + 1), 100.0 * correct / total, correct, total),
+        # )
 
     return run_loss / cnt, correct / total
 
@@ -345,12 +345,12 @@ def test(model, test_loader, criterion1):
             total += labels.size(0)
             cnt += 1
             correct += (predicted == labels).sum().item()
-            progress_bar(
-                batch_idx,
-                len(test_loader),
-                "Loss: %.3f | Acc: %.3f%% (%d/%d)"
-                % (run_loss / (batch_idx + 1), 100.0 * correct / total, correct, total),
-            )
+            # progress_bar(
+            #     batch_idx,
+            #     len(test_loader),
+            #     "Loss: %.3f | Acc: %.3f%% (%d/%d)"
+            #     % (run_loss / (batch_idx + 1), 100.0 * correct / total, correct, total),
+            # )
         print(f"Average time for inference: {pr_time / cnt}")
 
     return run_loss / cnt, correct / total
